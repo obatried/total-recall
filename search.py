@@ -29,6 +29,8 @@ def load_config():
 
 CFG = load_config()
 DB = os.path.expanduser(os.environ.get("DB_PATH") or CFG.get("DB_PATH") or "~/.cache/total-recall/index.db")
+MEM = os.path.expanduser(os.environ.get("MEM_DIR") or CFG.get("MEM_DIR") or "~/notes")
+ALIASES = os.path.expanduser(os.environ.get("ALIASES") or CFG.get("ALIASES") or os.path.join(MEM, ".aliases"))
 
 STOP = {"the","a","an","how","do","i","to","is","of","for","and","my","in","on","with",
         "what","can","me","you","it","that","this","be","or","at","from","are","we"}
@@ -46,7 +48,34 @@ def main():
     if not terms:
         if not tsv: print("total-recall: no usable query terms")
         return 1
-    match = " OR ".join(terms)
+
+    # Alias expansion: a query term in a synonym group also searches the other members,
+    # and counts as ONE matched concept if any member hits (bridges the synonym gap).
+    # Tokens only (alnum) so aliases can't inject FTS5 MATCH syntax.
+    groups = []
+    try:
+        for line in open(ALIASES, encoding="utf-8", errors="ignore"):
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            g = {tok for tok in re.findall(r"[a-z0-9]+", line.lower()) if len(tok) > 1}
+            if len(g) > 1:
+                groups.append(g)
+    except (FileNotFoundError, OSError):
+        pass
+    def expand(t):
+        for g in groups:
+            if t in g:
+                return g
+        return {t}
+    concepts, _seen = [], set()
+    for t in terms:
+        s = expand(t); key = frozenset(s)
+        if key in _seen:
+            continue
+        _seen.add(key); concepts.append((t, s))
+    all_terms = sorted({x for _, s in concepts for x in s})
+    match = " OR ".join(all_terms)
 
     if not os.path.exists(DB):
         if not tsv: print(f"total-recall: index not found at {DB} — run index.py first")
@@ -67,15 +96,16 @@ def main():
     if tsv:
         # Coordination: distinct query terms hitting each candidate (FTS stems, so
         # this stays consistent with ranking). Output: score nmatched nterms path
-        hits = {}
-        for t in terms:
+        # Coordination by CONCEPT: a concept counts as matched if ANY alias term hits.
+        term_hits = {}
+        for t in all_terms:
             try:
-                for (rid,) in con.execute("SELECT rowid FROM mem WHERE mem MATCH ?", (t,)):
-                    hits[rid] = hits.get(rid, 0) + 1
+                term_hits[t] = {rid for (rid,) in con.execute("SELECT rowid FROM mem WHERE mem MATCH ?", (t,))}
             except sqlite3.OperationalError:
-                continue
+                term_hits[t] = set()
         for rid, path, snip, score in rows:
-            print(f"{score:.2f}\t{hits.get(rid,0)}\t{len(terms)}\t{path}")
+            nmatched = sum(1 for _, s in concepts if any(rid in term_hits.get(x, ()) for x in s))
+            print(f"{score:.2f}\t{nmatched}\t{len(concepts)}\t{path}")
         return 0
 
     for rid, path, snip, score in rows:

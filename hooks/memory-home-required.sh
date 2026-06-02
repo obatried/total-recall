@@ -35,7 +35,7 @@ esac
 CONTENT=$(printf '%s' "$INPUT" | jq -r '.tool_input.content // ""')
 [ -z "$CONTENT" ] && exit 0
 ALLOWED_FILE=$(get_conf ALLOWED_INDEXES); [ -z "$ALLOWED_FILE" ] && ALLOWED_FILE="$MEM_DIR/.allowed-indexes"
-[ -f "$ALLOWED_FILE" ] || exit 0
+[ -r "$ALLOWED_FILE" ] || exit 0   # missing OR unreadable manifest -> fail open, don't deny
 
 HOME_FIELD=$(printf '%s' "$CONTENT" | awk '
   BEGIN{c=0}
@@ -61,4 +61,26 @@ Known indexes: $ALLOWED_LIST
 To add a new one, append it to $ALLOWED_FILE."
   exit 0
 fi
+
+# Description is the search surface (what recall matches against + shows). Require a real one.
+DESC=$(printf '%s' "$CONTENT" | awk '
+  BEGIN{c=0}
+  /^---$/{c++; if(c==1){f=1;next} if(c==2)exit}
+  f && /^description:/{sub(/^description: */,""); gsub(/"/,""); print; exit}')
+DESC_WORDS=$(printf '%s' "$DESC" | wc -w | tr -d ' ')
+if [ -z "$DESC" ] || [ "${DESC_WORDS:-0}" -lt 5 ]; then
+  emit_deny "Memory note '$REL' needs a substantive 'description:'. It's the search surface — what recall matches against and shows you later — so a vague or empty one means the note won't be found. Write a one-line description (~5+ words) in the words you'd search for."
+  exit 0
+fi
+
+# Soft, non-blocking nits (note IS allowed): missing created date, generic filename.
+WARN=""
+CREATED=$(printf '%s' "$CONTENT" | awk 'BEGIN{c=0} /^---$/{c++; if(c==1){f=1;next} if(c==2)exit} f && /^created:/{print "yes"; exit}')
+[ -z "$CREATED" ] && WARN="${WARN}no 'created:' date (used for staleness tracking); "
+SLUG=$(basename "$REL" .md | sed -E 's/^(feedback|reference|project|user|tool)_//')
+case "$SLUG" in
+  note[0-9]*|temp*|misc*|untitled*|new|draft*|stuff|thing*|test|tmp*)
+    WARN="${WARN}filename '$SLUG' is generic — name it by what you'd search for; " ;;
+esac
+[ -n "$WARN" ] && jq -nc --arg c "[memory nit — '$REL' was allowed] $WARN" '{hookSpecificOutput:{hookEventName:"PreToolUse",additionalContext:$c}}'
 exit 0

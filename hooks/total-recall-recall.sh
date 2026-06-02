@@ -43,7 +43,8 @@ SESSION_ID=$(printf '%s' "$INPUT" | jq -r '.session_id // "unknown"')
 case "$PROMPT" in '/'*|'<'*|'#'*) exit 0 ;; esac
 [ "${#PROMPT}" -lt 12 ] && exit 0
 
-CANDS=$(TOTAL_RECALL_CONFIG="$CONFIG" python3 "$SEARCH" --tsv "$PROMPT" 5 2>/dev/null | awk -F'\t' \
+TSV=$(TOTAL_RECALL_CONFIG="$CONFIG" python3 "$SEARCH" --tsv "$PROMPT" 5 2>/dev/null)
+CANDS=$(printf '%s\n' "$TSV" | awk -F'\t' \
   -v avg="$AVG" -v strong="$STRONG" -v ratio="$RATIO" -v idx="$INDEX_FILE" '
   NF>=4 {
     s=$1+0; m=$2+0; tot=$3+0; p=$4;
@@ -51,12 +52,28 @@ CANDS=$(TOTAL_RECALL_CONFIG="$CONFIG" python3 "$SEARCH" --tsv "$PROMPT" 5 2>/dev
     a=(m>0)? s/m : 0; r=(tot>0)? m/tot : 0;
     if ((m>=3 && a<=avg) || (s<=strong && m>=6 && r>=ratio)) print p;
   }')
-[ -z "$CANDS" ] && exit 0
+if [ -z "$CANDS" ]; then
+  # Near-miss logging: the gate surfaced nothing, but a plausibly-relevant candidate
+  # existed (loose raw-score floor) — the cases aliases/embeddings might fix. Logged to a
+  # separate file for review, never injected into context. Skip true no-matches.
+  TOP=$(printf '%s\n' "$TSV" | awk -F'\t' 'NR==1{print; exit}')
+  if [ -n "$TOP" ]; then
+    TS=$(printf '%s' "$TOP" | cut -f1); TM=$(printf '%s' "$TOP" | cut -f2)
+    TT=$(printf '%s' "$TOP" | cut -f3); TP=$(printf '%s' "$TOP" | cut -f4)
+    if [ -n "$TP" ] && awk -v s="$TS" 'BEGIN{exit !((s+0)<=-8)}'; then
+      MISS="$HOME/.cache/total-recall/recall-misses.jsonl"; mkdir -p "$(dirname "$MISS")" 2>/dev/null || true
+      jq -nc --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg pr "${PROMPT:0:160}" --arg p "$TP" \
+         --argjson s "${TS:-0}" --argjson m "${TM:-0}" --argjson tot "${TT:-0}" \
+         '{ts:$ts,prompt:$pr,top_candidate:$p,score:$s,nmatched:$m,nterms:$tot}' >> "$MISS" 2>/dev/null || true
+    fi
+  fi
+  exit 0
+fi
 
 SAFE_SID=$(printf '%s' "$SESSION_ID" | tr -cs 'A-Za-z0-9._-' '_'); [ -z "$SAFE_SID" ] && SAFE_SID="unknown"
 STATE_DIR="$HOME/.cache/total-recall"; mkdir -p "$STATE_DIR" 2>/dev/null || true
 SEEN_FILE="$STATE_DIR/recall-$SAFE_SID.seen"; touch "$SEEN_FILE" 2>/dev/null || true
-SEEN_COUNT=$(grep -c . "$SEEN_FILE" 2>/dev/null || echo 0)
+SEEN_COUNT=$(grep -c . "$SEEN_FILE" 2>/dev/null || true); SEEN_COUNT=${SEEN_COUNT:-0}
 
 label_of() {  # $1 = abs path -> description / first heading / humanized filename
   local d
@@ -75,6 +92,9 @@ while IFS= read -r rel; do
   abs="$MEM_DIR/$rel"; [ -f "$abs" ] || continue
   LINES="${LINES}• ${rel} — $(label_of "$abs")"$'\n'
   printf '%s\n' "$rel" >> "$SEEN_FILE"
+  # usage log (for the staleness report): which note got surfaced, when. Read-only re: notes.
+  jq -nc --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg p "$rel" '{ts:$ts,note:$p}' \
+     >> "$STATE_DIR/recall-usage.jsonl" 2>/dev/null || true
   EMITTED=$((EMITTED+1)); SEEN_COUNT=$((SEEN_COUNT+1))
 done <<< "$CANDS"
 [ "$EMITTED" -eq 0 ] && exit 0

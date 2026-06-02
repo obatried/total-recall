@@ -12,8 +12,9 @@ You have a persistent file-based memory at `<MEM_DIR>`. Write to it directly wit
 ```markdown
 ---
 name: <short-kebab-case-slug>
-description: <one-line summary — this is what search and recall match against, so phrase it in the words you'd use to look it up later>
+description: <one substantive line (~5+ words) — this is what search and recall match against, so phrase it in the words you'd use to look it up later. A vague/empty description is rejected.>
 home: <the index file this belongs to, e.g. MEMORY.md or topics/<topic>.md>
+created: <YYYY-MM-DD>
 metadata:
   type: user | feedback | project | reference
 ---
@@ -31,6 +32,7 @@ Link related memories with [[their-name]].>
 **Rules that make memory actually work:**
 - **One fact per file.** Don't append unrelated facts to an existing note; make a new one.
 - **Name files by what you'd search for**, not by a vague summary. `feedback_always_humanize_outbound.md` beats `feedback_writing_note_3.md`. The filename and `description` are how the fact gets found again.
+- **Give every note a substantive `description` and a `created:` date.** The guard rejects a vague/empty description (it's the search surface); `created:` powers the staleness review.
 - **Convert relative dates to absolute** ("today" → the actual date) before saving.
 - **Link liberally** with `[[name]]` — a link to a note that doesn't exist yet is fine; it marks something worth writing later.
 - **Check before creating.** Before writing a new note, see if one already covers it and update that instead. (The dedup guard will stop you on obvious duplicates.)

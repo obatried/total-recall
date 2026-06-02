@@ -6,4 +6,7 @@ exec_dir="$(cd "$(dirname "$0")" && pwd)"
 if [ "${1:-}" = "--reindex" ]; then
   exec python3 "$exec_dir/index.py"
 fi
+if [ "${1:-}" = "--stale" ]; then
+  shift; exec python3 "$exec_dir/stale.py" "$@"
+fi
 exec python3 "$exec_dir/search.py" "$@"

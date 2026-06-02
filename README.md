@@ -64,6 +64,8 @@ You mostly don't — it runs in the background. Day to day:
 - When Claude goes to save a note, it must declare where it's filed, gets auto-added to that index,
   and gets stopped if it's about to duplicate an existing note.
 - Search your own notes from the terminal: `./total-recall "some topic"` (or `--reindex` to rebuild).
+- **Synonyms:** add groups to `<MEM_DIR>/.aliases` (e.g. `car, automobile, vehicle`) so a search for one finds notes that use another — the keyword-friendly fix for the one thing keyword search can't do.
+- **Staleness review:** `./total-recall --stale` lists `project`/`reference` notes that are old *and* haven't been recalled lately, for you to review (never auto-deleted; durable `user`/`feedback` notes are left alone).
 
 ## How retrieval works
 
@@ -84,6 +86,7 @@ corpus of *hundreds* of notes; on a tiny corpus the gates rarely fire by design.
 | `MEM_DIR` | — | your notes folder |
 | `DB_PATH` | `~/.cache/total-recall/index.db` | the index cache |
 | `ALLOWED_INDEXES` | `<MEM_DIR>/.allowed-indexes` | valid `home:` targets (the discipline guard checks this) |
+| `ALIASES` | `<MEM_DIR>/.aliases` | synonym groups so search bridges different-words-same-meaning |
 | `ENFORCE_HOME` | on | set `0` to stop requiring a `home:` field on new notes |
 | `RECALL_AVG` | `-3.0` | recall path A: fire if score ÷ matched-terms ≤ this |
 | `RECALL_STRONG` / `RECALL_RATIO` | `-18` / `0.5` | recall path B: strong score + enough terms covered |

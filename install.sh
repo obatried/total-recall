@@ -54,6 +54,18 @@ if [ ! -f "$ALLOWED" ]; then
   echo "→ wrote index manifest: $ALLOWED"
 fi
 
+# synonym map (optional, empty by default) for alias-expanded search
+ALIASES_FILE="$NOTES/.aliases"
+if [ ! -f "$ALIASES_FILE" ]; then
+  cat > "$ALIASES_FILE" <<'EOF'
+# Synonym groups, one per line (comma-separated). A query term in a group also searches
+# the other members, bridging the "different words, same meaning" gap that keyword search
+# can't. Edit/extend freely. Examples:
+# car, automobile, vehicle
+# pay, payment, billing, invoice
+EOF
+fi
+
 # 2. config
 echo "→ writing config: $CONFIG"
 cat > "$CONFIG" <<EOF
@@ -62,6 +74,7 @@ TR_HOME="$TR_HOME"
 MEM_DIR="$NOTES"
 DB_PATH="$DB_PATH"
 ALLOWED_INDEXES="$ALLOWED"
+ALIASES="$NOTES/.aliases"
 
 # --- write discipline ---
 # ENFORCE_HOME=0      # set to 0 to stop requiring a 'home:' field on new notes

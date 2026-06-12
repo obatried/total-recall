@@ -55,6 +55,11 @@ Then **restart Claude Code** (hooks + CLAUDE.md load at session start).
 Already have a memory folder? Point the installer at it — it won't overwrite your notes, it just wires
 the tooling around them. Want it by hand? See [docs/manual-install.md](docs/manual-install.md).
 
+**Starting a `CLAUDE.md` from scratch?** Crib from [`CLAUDE.example.md`](CLAUDE.example.md) — a short
+fill-in-the-blank operating manual (who you are, how you like answers, your always/never rules) that
+loads every session so you never re-explain how you work. (This is separate from the memory-*writing*
+block the installer appends — that one teaches Claude how to *save* notes.)
+
 ## Works well with: recursive-learn
 
 total-recall gives your AI a **memory**. [recursive-learn](https://github.com/obatried/recursive-learn)

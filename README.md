@@ -55,6 +55,24 @@ Then **restart Claude Code** (hooks + CLAUDE.md load at session start).
 Already have a memory folder? Point the installer at it — it won't overwrite your notes, it just wires
 the tooling around them. Want it by hand? See [docs/manual-install.md](docs/manual-install.md).
 
+## Works well with: recursive-learn
+
+total-recall gives your AI a **memory**. [recursive-learn](https://github.com/obatried/recursive-learn)
+gives it a **`/learn` loop** — it audits its own mistakes at the end of a session and writes the lessons
+back, so they don't recur. Memory + self-correction is the full "give your AI a memory" setup.
+
+Install both at once with the bundled `meta-install.sh`:
+
+```bash
+git clone https://github.com/obatried/total-recall
+git clone https://github.com/obatried/recursive-learn   # sibling folder (optional)
+cd total-recall
+./meta-install.sh ~/.claude/memory
+```
+
+`meta-install.sh` runs this installer, then recursive-learn's — cloning recursive-learn to a temp dir
+automatically if it isn't sitting next to total-recall.
+
 ## Use it
 
 You mostly don't — it runs in the background. Day to day:
